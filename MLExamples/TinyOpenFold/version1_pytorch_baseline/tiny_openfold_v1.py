@@ -173,6 +173,43 @@ class PerformanceMonitor:
         return summary
 
 
+def get_available_devices() -> Tuple[list, bool]:
+    """
+    Detect available GPUs respecting ROCR_VISIBLE_DEVICES/HIP_VISIBLE_DEVICES/CUDA_VISIBLE_DEVICES.
+    
+    Returns:
+        (device_ids, multi_gpu): List of available device IDs and whether multi-GPU is enabled
+    """
+    if not torch.cuda.is_available():
+        return [], False
+    
+    # Check environment variables (priority: ROCR > HIP > CUDA)
+    rocr_devices = os.environ.get('ROCR_VISIBLE_DEVICES')
+    hip_devices = os.environ.get('HIP_VISIBLE_DEVICES')
+    cuda_devices = os.environ.get('CUDA_VISIBLE_DEVICES')
+    
+    env_devices = rocr_devices or hip_devices or cuda_devices
+    
+    if env_devices:
+        # Parse comma-separated device IDs
+        try:
+            device_ids = [int(d.strip()) for d in env_devices.split(',') if d.strip().isdigit()]
+            if not device_ids:
+                # If parsing failed, use all available
+                device_ids = list(range(torch.cuda.device_count()))
+        except ValueError:
+            device_ids = list(range(torch.cuda.device_count()))
+    else:
+        # Use all available devices
+        device_ids = list(range(torch.cuda.device_count()))
+    
+    # Filter device_ids to only those actually available
+    device_ids = [d for d in device_ids if d < torch.cuda.device_count()]
+    
+    multi_gpu = len(device_ids) > 1
+    return device_ids, multi_gpu
+
+
 def setup_deterministic_environment():
     """Configure PyTorch for deterministic execution."""
     seed = 42
@@ -771,16 +808,56 @@ def train_tiny_openfold(
     num_steps: int = 50,
     batch_size: int = 4,
     learning_rate: float = 3e-4,
-    use_amp: bool = False
+    use_amp: bool = False,
+    device_id: Optional[int] = None,
+    use_data_parallel: bool = True
 ):
-    """Train the Tiny OpenFold model with comprehensive profiling."""
+    """Train the Tiny OpenFold model with comprehensive profiling (single or multi-GPU)."""
 
     # Setup environment
     setup_deterministic_environment()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    
+    # Detect available devices
+    available_devices, multi_gpu_available = get_available_devices()
+    
+    # Device selection logic
+    if device_id is not None:
+        # Single device mode (explicit selection overrides everything)
+        if device_id >= torch.cuda.device_count():
+            raise ValueError(f"Device {device_id} not available. Only {torch.cuda.device_count()} GPU(s) found.")
+        device = torch.device(f"cuda:{device_id}")
+        use_multi_gpu = False
+        print(f"\n   Single GPU mode: Using cuda:{device_id} (explicit)")
+    elif multi_gpu_available and use_data_parallel and len(available_devices) > 1:
+        # Multi-GPU mode
+        device = torch.device(f"cuda:{available_devices[0]}")  # Primary device
+        use_multi_gpu = True
+        
+        # Show environment variable that was used
+        env_var = "ROCR_VISIBLE_DEVICES" if os.environ.get('ROCR_VISIBLE_DEVICES') else \
+                  "HIP_VISIBLE_DEVICES" if os.environ.get('HIP_VISIBLE_DEVICES') else \
+                  "CUDA_VISIBLE_DEVICES" if os.environ.get('CUDA_VISIBLE_DEVICES') else \
+                  "all available"
+        
+        print(f"\n   Multi-GPU mode: Using {len(available_devices)} GPUs")
+        print(f"   Device IDs: {available_devices} (from {env_var})")
+        print(f"   Primary device: cuda:{available_devices[0]}")
+        print(f"   Effective batch size: {batch_size} total (split across GPUs)")
+    else:
+        # Default single GPU or CPU
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        use_multi_gpu = False
+        print(f"\n   Single GPU mode: Using default device ({device})")
+    
     # Create model
-    model = TinyOpenFold(config).to(device)
+    model = TinyOpenFold(config)
+    
+    # Wrap with DataParallel if multi-GPU
+    if use_multi_gpu:
+        model = nn.DataParallel(model, device_ids=available_devices)
+        print(f"   Model wrapped with DataParallel")
+    
+    model = model.to(device)
 
     # Model summary
     total_params = sum(p.numel() for p in model.parameters())
@@ -792,6 +869,13 @@ def train_tiny_openfold(
     print(f"   Sequence length: {config.max_seq_len}")
     print(f"   Total parameters: {total_params:,}")
     print(f"   Model size: {total_params * 4 / 1e6:.1f} MB (FP32)")
+    
+    if isinstance(model, nn.DataParallel):
+        print(f"   Multi-GPU: {len(model.device_ids)} GPUs")
+        print(f"   Device IDs: {model.device_ids}")
+        print(f"   Primary device: {device}")
+    else:
+        print(f"   Device: {device}")
 
     # Create dataset
     dataset = ProteinDataset(config)
@@ -833,13 +917,13 @@ def train_tiny_openfold(
         if use_amp:
             with autocast():
                 outputs = model(msa_tokens, pair_features, target_distances)
-                loss = outputs['loss']
+                loss = outputs['loss'].mean()  # Average loss across GPUs for DataParallel
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
             outputs = model(msa_tokens, pair_features, target_distances)
-            loss = outputs['loss']
+            loss = outputs['loss'].mean()  # Average loss across GPUs for DataParallel
             loss.backward()
             optimizer.step()
 
@@ -866,10 +950,10 @@ def train_tiny_openfold(
             if use_amp:
                 with autocast():
                     outputs = model(msa_tokens, pair_features, target_distances)
-                    loss = outputs['loss']
+                    loss = outputs['loss'].mean()  # Average loss across GPUs for DataParallel
             else:
                 outputs = model(msa_tokens, pair_features, target_distances)
-                loss = outputs['loss']
+                loss = outputs['loss'].mean()  # Average loss across GPUs for DataParallel
         batch_timings['forward'] = monitor.end_timing()
 
         # Backward pass timing
@@ -978,9 +1062,11 @@ def main():
 
     # Training configuration
     parser.add_argument('--num-steps', type=int, default=50, help='Number of training steps')
-    parser.add_argument('--batch-size', type=int, default=4, help='Batch size')
+    parser.add_argument('--batch-size', type=int, default=4, help='Batch size (total across all GPUs)')
     parser.add_argument('--learning-rate', type=float, default=3e-4, help='Learning rate')
     parser.add_argument('--use-amp', action='store_true', help='Use automatic mixed precision')
+    parser.add_argument('--device', type=int, default=None, help='Single GPU device index (disables multi-GPU)')
+    parser.add_argument('--no-data-parallel', action='store_true', help='Disable DataParallel even if multiple GPUs available')
 
     # Profiling configuration
     parser.add_argument('--enable-pytorch-profiler', action='store_true', help='Enable PyTorch profiler')
@@ -1034,7 +1120,9 @@ def main():
                 config=config,
                 profiler_config=profiler_config,
                 num_steps=3,
-                batch_size=2
+                batch_size=2,
+                device_id=args.device,
+                use_data_parallel=not args.no_data_parallel
             )
             print("Validation successful! Environment ready.")
             return
@@ -1050,7 +1138,9 @@ def main():
             num_steps=args.num_steps,
             batch_size=args.batch_size,
             learning_rate=args.learning_rate,
-            use_amp=args.use_amp
+            use_amp=args.use_amp,
+            device_id=args.device,
+            use_data_parallel=not args.no_data_parallel
         )
 
         print(f"\nTraining completed successfully!")

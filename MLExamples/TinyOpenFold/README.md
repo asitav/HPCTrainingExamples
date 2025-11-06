@@ -93,6 +93,61 @@ python tiny_openfold_v1.py \
 python tiny_openfold_v1.py --use-amp --batch-size 8
 ```
 
+### Multi-GPU Training
+
+TinyOpenFold supports multi-GPU training using PyTorch's `nn.DataParallel`:
+
+```bash
+# Single GPU (explicit)
+python tiny_openfold_v1.py --device 0 --batch-size 8
+
+# Multi-GPU via environment variables (automatic)
+# ROCm (AMD GPUs)
+ROCR_VISIBLE_DEVICES=0,1,2,3 python tiny_openfold_v1.py --batch-size 32
+
+# CUDA (NVIDIA GPUs)
+CUDA_VISIBLE_DEVICES=0,1,2,3 python tiny_openfold_v1.py --batch-size 32
+
+# Disable DataParallel even with multiple GPUs visible
+python tiny_openfold_v1.py --no-data-parallel --device 0
+```
+
+**Best Practice:** Scale batch size proportionally with GPU count (e.g., 8 samples per GPU).
+
+### Scaling Studies
+
+Run multi-GPU scaling experiments to measure performance:
+
+```bash
+cd version1_pytorch_baseline
+
+# Quick scaling test (1, 2, 4, 8 GPUs)
+chmod +x quick_scaling_test.sh
+./quick_scaling_test.sh
+
+# Comprehensive scaling study with custom options
+chmod +x run.sh
+./run.sh --gpus "1 2 4 8" --batch-per-gpu 8 --steps 100
+
+# With mixed precision
+./run.sh --amp --steps 50
+
+# Multiple runs for statistics
+./run.sh --runs 3 --output-dir scaling_analysis
+```
+
+**Example Output:**
+```
+GPUs  Throughput (s/s)  Speedup  Efficiency
+----  ----------------  -------  ----------
+1     166.9             1.00x    100.0%
+2     202.7             1.21x     60.5%
+4     245.3             1.47x     36.8%
+8     249.1             1.49x     18.6%
+```
+
+See [`version1_pytorch_baseline/README.md`](version1_pytorch_baseline/README.md) for detailed multi-GPU documentation.
+
 ## Architecture Overview
 
 ### The Evoformer

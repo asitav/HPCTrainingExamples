@@ -281,6 +281,139 @@ Performance Summary:
 - Memory growth over time
 - Loss convergence behavior
 
+## Multi-GPU Training and Scaling Studies
+
+### Multi-GPU Training with DataParallel
+
+TinyOpenFold supports multi-GPU training using PyTorch's `nn.DataParallel`. The implementation automatically detects and uses multiple GPUs based on environment variables.
+
+**Single GPU (Explicit):**
+```bash
+# Use specific GPU
+python tiny_openfold_v1.py --device 0 --batch-size 8
+```
+
+**Multi-GPU (Automatic Detection):**
+```bash
+# ROCm (AMD GPUs) - automatically uses GPUs 0 and 1
+ROCR_VISIBLE_DEVICES=0,1 python tiny_openfold_v1.py --batch-size 16
+
+# CUDA (NVIDIA GPUs) - automatically uses GPUs 0, 1, 2, 3
+CUDA_VISIBLE_DEVICES=0,1,2,3 python tiny_openfold_v1.py --batch-size 32
+
+# Disable multi-GPU even if multiple GPUs are available
+python tiny_openfold_v1.py --no-data-parallel --device 0 --batch-size 8
+```
+
+**Best Practices:**
+- Scale batch size proportionally with GPU count (e.g., 8 per GPU)
+- The effective batch size is split across GPUs automatically
+- Monitor per-GPU memory usage to avoid OOM errors
+- Use `--device` to override automatic GPU detection for single-GPU runs
+
+### Running Scaling Studies
+
+Two scripts are provided for conducting GPU scaling studies:
+
+#### Quick Scaling Test (Simple)
+
+For a quick test with 1, 2, 4, and 8 GPUs:
+
+```bash
+# Make script executable
+chmod +x quick_scaling_test.sh
+
+# Run quick scaling test (8 samples per GPU, 50 steps)
+./quick_scaling_test.sh
+```
+
+**Output:**
+- Creates timestamped directory with logs for each GPU configuration
+- Automatically calculates speedup and efficiency
+- Generates summary table with throughput comparison
+
+**Example Results:**
+```
+GPUs     Throughput (s/s)     Speedup      Efficiency
+----     -------------------  ---------    ----------
+1        166.9                1.00x        100.0%
+2        202.7                1.21x        60.5%
+4        245.3                1.47x        36.8%
+8        249.1                1.49x        18.6%
+```
+
+#### Comprehensive Scaling Study (Advanced)
+
+For more control and statistical analysis:
+
+```bash
+# Make script executable
+chmod +x run.sh
+
+# Run full scaling study with defaults
+./run.sh
+
+# Custom configuration
+./run.sh --gpus "1 2 4 8" --batch-per-gpu 8 --steps 100 --runs 3
+
+# With mixed precision and profiling
+./run.sh --amp --profile --steps 50
+
+# Specify output directory
+./run.sh --output-dir my_scaling_study_$(date +%Y%m%d)
+
+# Show help
+./run.sh --help
+```
+
+**Options:**
+- `--gpus <list>`: GPU counts to test (default: "1 2 4 8")
+- `--batch-per-gpu <n>`: Batch size per GPU (default: 8)
+- `--steps <n>`: Training steps per run (default: 50)
+- `--runs <n>`: Number of runs per configuration for statistics (default: 1)
+- `--amp`: Enable mixed precision training (FP16)
+- `--profile`: Enable PyTorch profiler
+- `--output-dir <dir>`: Custom output directory
+
+**Output Files:**
+```
+scaling_study_TIMESTAMP/
+├── config.txt                    # Study configuration
+├── summary.txt                   # Human-readable summary with statistics
+├── summary.csv                   # Machine-readable results
+├── gpu1_batch8_run1.log          # Detailed logs for each run
+├── gpu2_batch16_run1.log
+├── gpu4_batch32_run1.log
+└── gpu8_batch64_run1.log
+```
+
+### Understanding Scaling Efficiency
+
+**Scaling Metrics:**
+- **Speedup**: `Throughput(N GPUs) / Throughput(1 GPU)`
+- **Efficiency**: `(Speedup / N GPUs) × 100%`
+
+**Expected Behavior:**
+- **Ideal Linear Scaling**: 100% efficiency (rare in practice)
+- **Good Scaling**: 70-90% efficiency for 2-4 GPUs
+- **Diminishing Returns**: Efficiency drops with more GPUs due to:
+  - Communication overhead between GPUs
+  - DataParallel synchronization costs
+  - Small model size (2.6M parameters)
+  - Memory bandwidth limitations
+
+**TinyOpenFold Scaling Characteristics:**
+- Sub-linear scaling is expected due to small model size
+- Communication overhead becomes significant at 4+ GPUs
+- Best efficiency typically at 2-4 GPUs
+- Beyond 8 GPUs, overhead may exceed benefits for this model size
+
+**Optimization Tips:**
+- Use larger batch sizes per GPU to amortize communication costs
+- Enable mixed precision (`--use-amp`) to reduce memory and increase throughput
+- Consider gradient accumulation for effective larger batch sizes
+- For production OpenFold, use model parallelism instead of data parallelism
+
 ## Command Reference
 
 ### Model Configuration
