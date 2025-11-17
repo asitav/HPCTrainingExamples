@@ -182,7 +182,7 @@ run_experiment() {
     fi
     
     if [ "$USE_PROFILE" = true ]; then
-        cmd="$cmd --enable-profiler"
+        cmd="$cmd --enable-pytorch-profiler"
     fi
     
     # Set environment and run
