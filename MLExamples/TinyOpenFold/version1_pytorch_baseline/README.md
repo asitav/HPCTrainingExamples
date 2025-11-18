@@ -170,6 +170,76 @@ tensorboard --logdir ./profiles
 - **Memory View**: Where are memory allocations happening?
 - **Timeline**: Are there idle periods or synchronization issues?
 
+### DeepSpeed FLOPS Profiler
+
+Analyze computational efficiency and FLOPS breakdown using DeepSpeed:
+
+```bash
+# Basic FLOPS analysis (single GPU, default device)
+./run_deepspeed_flops.sh
+
+# Profile on specific GPU
+./run_deepspeed_flops.sh --device 1
+
+# Multi-GPU comparative analysis (all available GPUs - 8 on MI250X)
+./run_deepspeed_flops.sh --multi-gpu
+
+# Multi-GPU analysis (specific GPUs)
+./run_deepspeed_flops.sh --devices "0,1,2"
+
+# Comprehensive analysis with roofline model
+./run_deepspeed_flops.sh --all --batch-size 4 --seq-len 64
+
+# Custom configuration
+./run_deepspeed_flops.sh \
+    --batch-size 8 \
+    --seq-len 128 \
+    --num-blocks 8 \
+    --roofline \
+    --intensity
+```
+
+**Key Metrics from FLOPS Analysis:**
+- **Model FLOPS Utilization (MFU)**: Efficiency of GPU usage (target: 40-60% for baseline)
+- **FLOPS Breakdown**: Which Evoformer components use most compute
+- **Arithmetic Intensity**: Memory-bound vs compute-bound classification
+- **Roofline Data**: Optimization recommendations
+- **Multi-GPU Efficiency**: Scaling efficiency across multiple GPUs (target: >90% for good scaling)
+
+**Example Output (Single GPU):**
+```
+FLOPS Analysis Summary:
+   Total FLOPS per step: 2.45e+11
+   Model FLOPS Utilization: 15.3%
+   
+Evoformer FLOPS Breakdown:
+   msa_attention: 8.32e+10 (34.0%)
+   triangle_multiplication: 6.21e+10 (25.4%)
+   pair_transition: 4.15e+10 (17.0%)
+```
+
+**Example Output (Multi-GPU):**
+```
+Aggregate Multi-GPU Summary:
+   Number of GPUs: 8
+   Total System TFLOPS: 196.8
+   Average MFU: 15.8%
+   Total Throughput: 84.6 samples/sec
+   Multi-GPU Efficiency: 95.2%
+   Speedup vs Single GPU: 7.62x
+```
+
+**Multi-GPU Analysis:**
+- Profiles each GPU independently to measure per-GPU FLOPS
+- Calculates aggregate system TFLOPS (sum across all GPUs)
+- Reports multi-GPU efficiency (actual speedup / ideal speedup)
+- Identifies GPU-to-GPU performance variance (MFU std dev)
+- Useful for understanding scaling bottlenecks and load balancing
+
+**See Also:** 
+- `FLOPS_ANALYSIS.md` for detailed documentation and workflows
+- `PROFILER_COMPARISON_GUIDE.md` for DeepSpeed FLOPS vs PyTorch Profiler comparison
+
 ### Memory Profiling
 
 Track memory usage throughout training:

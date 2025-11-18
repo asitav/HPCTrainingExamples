@@ -174,6 +174,9 @@ run_experiment() {
     # Create log filename
     local log_file="$OUTPUT_DIR/gpu${num_gpus}_batch${batch_size}_run${run_num}.log"
     
+    # Create profile directory for this experiment
+    local profile_dir="$OUTPUT_DIR/profiles_gpu${num_gpus}_batch${batch_size}_run${run_num}"
+    
     # Build command
     local cmd="python $PYTHON_SCRIPT --batch-size $batch_size --num-steps $STEPS"
     
@@ -182,7 +185,7 @@ run_experiment() {
     fi
     
     if [ "$USE_PROFILE" = true ]; then
-        cmd="$cmd --enable-pytorch-profiler"
+        cmd="$cmd --enable-pytorch-profiler --profile-dir $profile_dir"
     fi
     
     # Set environment and run
@@ -315,6 +318,9 @@ done
     echo "  - Detailed logs: $OUTPUT_DIR/gpu*_batch*_run*.log"
     echo "  - CSV data: $SUMMARY_FILE"
     echo "  - This summary: $SUMMARY_TXT"
+    if [ "$USE_PROFILE" = true ]; then
+        echo "  - Profiling data: $OUTPUT_DIR/profiles_gpu*_batch*_run*/"
+    fi
     
 } | tee "$SUMMARY_TXT"
 
@@ -334,4 +340,14 @@ echo -e "${YELLOW}To analyze results:${NC}"
 echo "  cat $SUMMARY_TXT"
 echo "  cat $SUMMARY_FILE"
 echo "  grep 'Average training speed:' $OUTPUT_DIR/*.log"
+
+if [ "$USE_PROFILE" = true ]; then
+    echo ""
+    echo -e "${YELLOW}To view profiling data:${NC}"
+    echo "  # View in Chrome trace viewer (chrome://tracing)"
+    echo "  ls $OUTPUT_DIR/profiles_gpu*/*.pt.trace.json"
+    echo ""
+    echo "  # Or use TensorBoard:"
+    echo "  tensorboard --logdir $OUTPUT_DIR/profiles_gpu1_batch8_run1"
+fi
 
