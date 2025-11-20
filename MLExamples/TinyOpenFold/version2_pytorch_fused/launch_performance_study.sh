@@ -107,7 +107,6 @@ for batch_size in $BATCH_SIZES; do
                 --batch-size $batch_size \
                 --seq-len $seq_len \
                 --num-steps $NUM_STEPS \
-                --device $DEVICE \
                 --profile-dir "${config_name}_run${run}" \
                 > "${config_name}_run${run}.log" 2>&1
         done
@@ -131,7 +130,6 @@ if [ "$RUN_BASELINE" = true ]; then
                     --batch-size $batch_size \
                     --seq-len $seq_len \
                     --num-steps $NUM_STEPS \
-                    --device $DEVICE \
                     --disable-all-fusion \
                     --profile-dir "${config_name}_run${run}" \
                     > "${config_name}_run${run}.log" 2>&1
@@ -178,7 +176,6 @@ if [ "$RUN_ABLATION" = true ]; then
                 --batch-size $BATCH_SIZE \
                 --seq-len $SEQ_LEN \
                 --num-steps $NUM_STEPS \
-                --device $DEVICE \
                 $flags \
                 --profile-dir "ablation_${name}_run${run}" \
                 > "ablation_${name}_run${run}.log" 2>&1
