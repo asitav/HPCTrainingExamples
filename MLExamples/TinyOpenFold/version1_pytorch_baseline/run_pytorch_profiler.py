@@ -105,14 +105,17 @@ class PyTorchProfilerAnalyzer:
 
         def trace_handler(prof):
             """Custom trace handler for comprehensive output."""
-            # Export Chrome trace
+            # Export Chrome trace for both TensorBoard and direct viewing
             chrome_trace_path = self.profile_dir / f"trace_step_{prof.step_num}.json"
             prof.export_chrome_trace(str(chrome_trace_path))
-
+            
             # Export stacks (if available)
             if hasattr(prof, 'export_stacks'):
                 stacks_path = self.profile_dir / f"stacks_step_{prof.step_num}.txt"
-                prof.export_stacks(str(stacks_path), "self_cpu_time_total")
+                try:
+                    prof.export_stacks(str(stacks_path), "self_cpu_time_total")
+                except Exception as e:
+                    print(f"   Warning: Could not export stacks: {e}")
 
             print(f"   Exported trace for step {prof.step_num}")
 
@@ -133,8 +136,15 @@ class PyTorchProfilerAnalyzer:
             on_trace_ready=trace_handler
         ) as prof:
             model.train()
+            
+            # Track timing for throughput
+            import time
+            step_times = []
+            start_time = time.time()
 
             for step in range(num_steps):
+                step_start = time.time()
+                
                 # Get batch
                 msa_tokens, pair_tokens, targets = dataset.get_batch(batch_size)
                 msa_tokens = msa_tokens.to(device)
@@ -157,9 +167,34 @@ class PyTorchProfilerAnalyzer:
 
                 # Profiler step
                 prof.step()
+                
+                # Track step time
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                step_end = time.time()
+                step_times.append(step_end - step_start)
 
-                if step % 5 == 0:
+                if step % 10 == 0:
                     print(f"   Step {step}/{num_steps}, Loss: {loss.item():.4f}")
+
+            # Calculate and print throughput summary
+            total_time = time.time() - start_time
+            total_samples = num_steps * batch_size
+            avg_step_time = sum(step_times) / len(step_times)
+            avg_throughput = batch_size / avg_step_time
+            
+            print(f"\n{'='*70}")
+            print(f"Profiling Throughput Summary:")
+            print(f"{'='*70}")
+            print(f"   Total steps:           {num_steps}")
+            print(f"   Batch size:            {batch_size}")
+            print(f"   Total samples:         {total_samples}")
+            print(f"   Total time:            {total_time:.2f} seconds")
+            print(f"   Average step time:     {avg_step_time*1000:.2f} ms")
+            print(f"   Average throughput:    {avg_throughput:.1f} samples/sec")
+            print(f"   Min step time:         {min(step_times)*1000:.2f} ms")
+            print(f"   Max step time:         {max(step_times)*1000:.2f} ms")
+            print(f"{'='*70}\n")
 
         # Save profiler data for analysis
         self.profile_data = prof

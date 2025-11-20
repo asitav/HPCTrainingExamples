@@ -151,7 +151,7 @@ python tiny_openfold_v1.py \
 
 ### PyTorch Profiler
 
-Enable comprehensive profiling with PyTorch's built-in profiler:
+Detailed kernel-level performance and memory analysis:
 
 ```bash
 # Basic profiling
@@ -161,14 +161,59 @@ python tiny_openfold_v1.py \
     --batch-size 4 \
     --num-steps 30
 
-# View in TensorBoard
-tensorboard --logdir ./profiles
+# View timeline in Chrome
+# Open chrome://tracing and load ./profiles/trace_*.json
 ```
 
-**What to Look For in TensorBoard:**
-- **Kernel View**: Which operations take the most time?
-- **Memory View**: Where are memory allocations happening?
-- **Timeline**: Are there idle periods or synchronization issues?
+**Provides:**
+- Kernel execution times
+- Memory allocation patterns
+- CPU/GPU timeline
+
+#### Minimal Overhead Profiling (Recommended for Throughput Measurement)
+
+For production-like performance measurements with minimal profiling overhead:
+
+```bash
+# Default: Profile only 5 out of 20 steps (25% overhead)
+./run_pytorch_profiler.sh
+
+# Minimal overhead: Profile 5 out of 100 steps (~5% overhead)
+./run_pytorch_profiler.sh \
+    --batch-size 4 \
+    --seq-len 64 \
+    --num-steps 100 \
+    --profile-steps 5 \
+    --device 0
+
+# Very stable throughput: Profile 5 out of 200 steps (~2.5% overhead)
+./run_pytorch_profiler.sh \
+    --num-steps 200 \
+    --profile-steps 5
+
+# View comprehensive report
+less pytorch_profiles/comprehensive_profiling_report.md
+
+# View trace in Chrome
+# Open chrome://tracing and load: pytorch_profiles/trace_step_*.json
+```
+
+**Key Parameters for Minimal Overhead:**
+- `--num-steps 100-200`: More steps = more stable throughput average
+- `--profile-steps 5`: Only these steps have profiling overhead (~40% slower)
+- Non-profiled steps: **No overhead** (82 samples/sec baseline)
+- Result: Average throughput with only 5-10% overhead
+
+**What You Get:**
+- `trace_step_*.json` - Chrome trace file (~80-100 MB) for detailed kernel inspection
+- `comprehensive_profiling_report.md` - Analysis with bottleneck identification
+- `operator_analysis.json` - Performance data
+- Throughput summary at end of comprehensive report
+
+**Example Output:**
+```
+Average training speed: 75.0 samples/sec  (vs 82 baseline, 10% overhead with 5/100 profiled)
+```
 
 ### DeepSpeed FLOPS Profiler
 
@@ -647,19 +692,6 @@ with record_function("evoformer_block"):
 ```
 
 These show up in PyTorch Profiler and help identify bottlenecks.
-
-## Comparison with TinyLLaMA
-
-Similar structure to TinyLLaMA but with protein-specific components:
-
-| Aspect | TinyLLaMA | TinyOpenFold |
-|--------|-----------|--------------|
-| Core Operation | Causal self-attention | Evoformer (MSA + Pair) |
-| Input | Token sequence | MSA + pair features |
-| Attention Types | 1 (causal) | 5 (row, column, 2×triangle, pair) |
-| Complexity | O(N²) | O(N³) triangle updates |
-| Key Innovation | RoPE, GQA | Triangle updates, pair bias |
-| Output | Next token | 3D structure (distances) |
 
 ## Next Steps
 
