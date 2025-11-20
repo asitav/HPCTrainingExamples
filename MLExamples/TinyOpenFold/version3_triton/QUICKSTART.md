@@ -173,7 +173,6 @@ After successful run:
 ## Support
 
 - **Full Documentation**: `README.md`
-- **Implementation Details**: `IMPLEMENTATION_SUMMARY.md`
 - **Exercises**: `exercises/exercise*.md`
 - **Architecture**: `../ARCHITECTURE.md`
 
@@ -183,7 +182,6 @@ After successful run:
 - [Exercise 1: Triton Basics](exercises/exercise1_triton_basics.md)
 - [Exercise 2: Triangle Optimization](exercises/exercise2_triangle_optimization.md)
 - [Exercise 3: Flash Attention](exercises/exercise3_msa_attention.md)
-- [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
 
 ---
 
