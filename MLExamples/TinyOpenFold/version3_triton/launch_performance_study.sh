@@ -64,7 +64,11 @@ run_version() {
     echo "Running ${version} (Run ${run}/${NUM_RUNS})"
     echo "-------------------------------------------"
     
-    local output_dir="${STUDY_DIR}/${version}_run${run}"
+    # Save current directory
+    local current_dir=$(pwd)
+    
+    # Create output directory with absolute path
+    local output_dir="${current_dir}/${STUDY_DIR}/${version}_run${run}"
     mkdir -p ${output_dir}
     
     cd ${version_dir}
@@ -214,13 +218,13 @@ def compute_statistics(results):
                         metrics[key] = []
                     metrics[key].append(value)
         
-        # Compute statistics
+        # Compute statistics (convert numpy types to Python native types for JSON)
         for metric, values in metrics.items():
             stats[version][metric] = {
-                'mean': np.mean(values),
-                'std': np.std(values),
-                'min': np.min(values),
-                'max': np.max(values)
+                'mean': float(np.mean(values)),
+                'std': float(np.std(values)),
+                'min': float(np.min(values)),
+                'max': float(np.max(values))
             }
     
     return stats
