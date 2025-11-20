@@ -1,0 +1,55 @@
+{
+  "version": "v1_baseline",
+  "timestamp": "20251120_173603",
+  "config": {
+    "vocab_size": 21,
+    "msa_dim": 64,
+    "pair_dim": 128,
+    "n_evoformer_blocks": 4,
+    "n_heads_msa": 4,
+    "n_heads_pair": 4,
+    "msa_intermediate_dim": 256,
+    "pair_intermediate_dim": 512,
+    "outer_product_dim": 32,
+    "max_seq_len": 64,
+    "n_seqs": 16,
+    "pair_input_dim": 65,
+    "dropout": 0.0,
+    "norm_eps": 1e-05
+  },
+  "profiler_config": {
+    "enable_pytorch_profiler": false,
+    "enable_memory_profiling": false,
+    "profile_operators": false,
+    "profile_dir": "./pytorch_profiles",
+    "sort_by": "cuda_time_total",
+    "warmup_steps": 3,
+    "profile_steps": 5,
+    "export_chrome_trace": true,
+    "export_stacks": false
+  },
+  "performance_summary": {
+    "total_samples": 200,
+    "avg_training_speed": 81.9435282600271,
+    "avg_loss": 33.288120651245116,
+    "avg_batch_time": 0.04881462574005127,
+    "avg_forward_time": 0.01797321319580078,
+    "avg_backward_time": 0.026756677627563476,
+    "avg_optimizer_time": 0.0040847349166870115,
+    "peak_memory_mb": 195.66796875,
+    "avg_memory_mb": 195.66796875
+  },
+  "training_params": {
+    "num_steps": 50,
+    "batch_size": 4,
+    "learning_rate": 0.0003,
+    "use_amp": false
+  },
+  "system_info": {
+    "device": "cuda",
+    "gpu_name": "AMD Instinct MI300X",
+    "pytorch_version": "2.9.1+rocm6.4",
+    "rocm_version": "N/A",
+    "timestamp_iso": "2025-11-20T17:36:03.544877"
+  }
+}

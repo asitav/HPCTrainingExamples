@@ -1,0 +1,49 @@
+{
+  "version": "v3_triton",
+  "timestamp": "20251120_173833",
+  "config": {
+    "vocab_size": 21,
+    "msa_dim": 64,
+    "pair_dim": 128,
+    "n_evoformer_blocks": 4,
+    "n_heads_msa": 4,
+    "n_heads_pair": 4,
+    "msa_intermediate_dim": 256,
+    "pair_intermediate_dim": 512,
+    "outer_product_dim": 32,
+    "max_seq_len": 64,
+    "n_seqs": 16,
+    "pair_input_dim": 65,
+    "dropout": 0.0,
+    "norm_eps": 1e-05
+  },
+  "performance_summary": {
+    "avg_training_speed": 160.15325334015037,
+    "peak_memory_mb": 218.51025390625,
+    "avg_memory_mb": 218.51025390625,
+    "final_loss": 33.21031265258789,
+    "avg_batch_time": 0.024976077079772948,
+    "avg_forward_time": 0.01456845760345459,
+    "avg_backward_time": 0.008291940689086914,
+    "avg_optimizer_time": 0.0014998674392700194
+  },
+  "training_params": {
+    "num_steps": 50,
+    "batch_size": 4,
+    "learning_rate": 0.0003
+  },
+  "triton_kernels": {
+    "layernorm": "ACTIVE",
+    "flash_attention_msa_row": "ACTIVE",
+    "flash_attention_msa_col": "ACTIVE",
+    "flash_attention_triangle": "ACTIVE"
+  },
+  "system_info": {
+    "device": "cuda",
+    "gpu_name": "AMD Instinct MI300X",
+    "pytorch_version": "2.9.1+rocm6.4",
+    "triton_version": "3.5.1",
+    "rocm_version": "N/A",
+    "timestamp_iso": "2025-11-20T17:38:33.711529"
+  }
+}

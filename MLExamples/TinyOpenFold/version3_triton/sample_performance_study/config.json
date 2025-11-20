@@ -1,0 +1,8 @@
+{
+  "timestamp": "20251120_173520",
+  "num_steps": 50,
+  "batch_size": 4,
+  "seq_len": 64,
+  "num_runs": 3,
+  "versions": ["v1_baseline", "v2_fused", "v3_triton"]
+}
