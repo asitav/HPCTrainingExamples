@@ -5,6 +5,9 @@
 
 set -e  # Exit on error
 
+# Save script directory for absolute path references
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -44,8 +47,10 @@ OUTPUT_DIR="./rocprofv3_results_$(date +%Y%m%d_%H%M%S)"
 PROFILE_KERNELS=true
 PROFILE_HIP_TRACE=true
 TRACE_GPU_MEMORY=true
+RUNTIME_TRACE=false
 DETAILED_METRICS=false
 FUSION_ANALYSIS=true
+OUTPUT_PFTRACE=false
 
 # Fusion configuration
 ENABLE_ALL_FUSION=true
@@ -100,8 +105,24 @@ while [[ $# -gt 0 ]]; do
             TRACE_GPU_MEMORY=true
             shift
             ;;
+        --runtime-trace)
+            RUNTIME_TRACE=true
+            shift
+            ;;
+        --no-runtime-trace)
+            RUNTIME_TRACE=false
+            shift
+            ;;
         --detailed-metrics)
             DETAILED_METRICS=true
+            shift
+            ;;
+        --output-pftrace)
+            OUTPUT_PFTRACE=true
+            shift
+            ;;
+        --no-pftrace)
+            OUTPUT_PFTRACE=false
             shift
             ;;
         --no-fusion-analysis)
@@ -141,7 +162,11 @@ while [[ $# -gt 0 ]]; do
             echo "  --profile-hip-trace     Enable HIP API tracing (default)"
             echo "  --no-hip-trace          Disable HIP API tracing"
             echo "  --trace-gpu-memory      Enable GPU memory tracing (default)"
+            echo "  --runtime-trace         Enable runtime trace (default)"
+            echo "  --no-runtime-trace      Disable runtime trace"
             echo "  --detailed-metrics      Enable detailed hardware metrics"
+            echo "  --output-pftrace        Enable pftrace time trace output format"
+            echo "  --no-pftrace            Disable pftrace output (default)"
             echo "  --no-fusion-analysis    Disable fusion-specific analysis"
             echo ""
             echo "Fusion Configuration:"
@@ -155,6 +180,7 @@ while [[ $# -gt 0 ]]; do
             echo "  $0 --batch-size 8 --seq-len 128      # Larger workload"
             echo "  $0 --disable-all-fusion              # Baseline comparison"
             echo "  $0 --detailed-metrics                # Detailed hardware counters"
+            echo "  $0 --output-pftrace                  # Generate pftrace time trace output"
             exit 0
             ;;
         *)
@@ -191,7 +217,9 @@ log_info "Profiling Options:"
 log_info "  Kernel tracing: $PROFILE_KERNELS"
 log_info "  HIP API tracing: $PROFILE_HIP_TRACE"
 log_info "  GPU memory tracing: $TRACE_GPU_MEMORY"
+log_info "  Runtime trace: $RUNTIME_TRACE"
 log_info "  Detailed metrics: $DETAILED_METRICS"
+log_info "  Pftrace output: $OUTPUT_PFTRACE"
 log_info "  Fusion analysis: $FUSION_ANALYSIS"
 echo ""
 log_info "Fusion Configuration:"
@@ -223,11 +251,33 @@ fi
 
 # Add GPU memory tracing
 if [ "$TRACE_GPU_MEMORY" = true ]; then
-    ROCPROF_ARGS="$ROCPROF_ARGS --hip-trace"
+    ROCPROF_ARGS="$ROCPROF_ARGS --memory-copy-trace"
 fi
 
-# Build Python command
-PYTHON_CMD="python tiny_openfold_v2.py"
+# Add runtime trace --runtime-trace from command line option if provided
+if [ "$RUNTIME_TRACE" = true ]; then
+    ROCPROF_ARGS="$ROCPROF_ARGS --runtime-trace"
+fi
+
+# Add pftrace output format for time trace
+if [ "$OUTPUT_PFTRACE" = true ]; then
+    ROCPROF_ARGS="$ROCPROF_ARGS --output-format pftrace"
+fi
+
+# Add output file prefix for rocprofv3 -o flag (similar to PyTorch profiler format: hostname_pid.timestamp)
+# Format: {hostname}_{pid}.{nanoseconds_since_epoch}
+# Use Python to get nanosecond timestamp (fallback to date if Python unavailable)
+if command -v python3 &> /dev/null; then
+    NANOSECONDS=$(python3 -c 'import time; print(int(time.time() * 1e9))' 2>/dev/null)
+else
+    # Fallback: use date with nanoseconds if available, otherwise seconds
+    NANOSECONDS=$(date +%s%N 2>/dev/null || date +%s)000000000
+fi
+OUTPUT_FILE_PREFIX="$(hostname)_$$.${NANOSECONDS}"
+ROCPROF_ARGS="$ROCPROF_ARGS -o $OUTPUT_FILE_PREFIX"
+
+# Build Python command with absolute path
+PYTHON_SCRIPT="$SCRIPT_DIR/tiny_openfold_v2.py"
 PYTHON_ARGS="--batch-size $BATCH_SIZE --seq-len $SEQ_LEN --num-blocks $NUM_BLOCKS --num-seqs $NUM_SEQS --num-steps $NUM_STEPS"
 
 # Add fusion configuration
@@ -241,11 +291,11 @@ fi
 
 # Run profiling
 log_step "Starting rocprofv3 profiling..."
-log_rocprof "Command: $ROCPROF_CMD $ROCPROF_ARGS -- $PYTHON_CMD $PYTHON_ARGS"
+log_rocprof "Command: $ROCPROF_CMD $ROCPROF_ARGS -- python $PYTHON_SCRIPT $PYTHON_ARGS"
 echo ""
 
 cd "$OUTPUT_DIR"
-$ROCPROF_CMD $ROCPROF_ARGS -- $PYTHON_CMD $PYTHON_ARGS 2>&1 | tee rocprofv3.log
+$ROCPROF_CMD $ROCPROF_ARGS -- python "$PYTHON_SCRIPT" $PYTHON_ARGS 2>&1 | tee rocprofv3.log
 cd - > /dev/null
 
 log_step "Profiling complete!"
@@ -364,6 +414,9 @@ log_info "Key files:"
 log_info "  - rocprofv3.log              : Full profiling log"
 log_info "  - *_kernel_stats.csv         : Kernel statistics"
 log_info "  - rocprofv3_summary.txt      : Analysis summary"
+if [ "$OUTPUT_PFTRACE" = true ]; then
+    log_info "  - *.pftrace                 : Time trace output (pftrace format)"
+fi
 echo ""
 log_info "To view kernel statistics:"
 log_info "  less $OUTPUT_DIR/rocprofv3_summary.txt"
