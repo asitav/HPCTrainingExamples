@@ -286,6 +286,40 @@ echo "======================================================================"
 echo ""
 echo "Results saved to: $PROFILE_DIR"
 echo ""
+
+# Extract and display throughput information from fusion_analysis.json
+if [ -f "${PROFILE_DIR}/fusion_analysis.json" ]; then
+    echo "======================================================================"
+    echo "Performance Summary"
+    echo "======================================================================"
+    
+    # Extract throughput stats using Python
+    python3 << EOF 2>/dev/null || echo "  (Throughput information not available)"
+import json
+import sys
+
+try:
+    with open('${PROFILE_DIR}/fusion_analysis.json', 'r') as f:
+        data = json.load(f)
+    
+    throughput = data.get('throughput_statistics', {})
+    if throughput:
+        print(f"  Total steps:           {throughput.get('total_steps', 'N/A')}")
+        print(f"  Batch size:            {throughput.get('batch_size', 'N/A')}")
+        print(f"  Total samples:         {throughput.get('total_samples', 'N/A')}")
+        print(f"  Total time:            {throughput.get('total_time_sec', 0):.2f} seconds")
+        print(f"  Average step time:     {throughput.get('avg_step_time_ms', 0):.2f} ms")
+        print(f"  Average throughput:     {throughput.get('avg_throughput_samples_per_sec', 0):.2f} samples/sec")
+        print(f"  Min step time:         {throughput.get('min_step_time_ms', 0):.2f} ms")
+        print(f"  Max step time:         {throughput.get('max_step_time_ms', 0):.2f} ms")
+    else:
+        print("  (Throughput information not available)")
+except Exception as e:
+    print(f"  (Error reading throughput data: {e})")
+EOF
+    echo ""
+fi
+
 echo "To analyze results:"
 echo "  1. View comprehensive report:"
 echo "     less ${PROFILE_DIR}/comprehensive_profiling_report.md"

@@ -40,6 +40,7 @@ import argparse
 import json
 import os
 import numpy as np
+import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -77,6 +78,7 @@ class FusedProfilerAnalyzer:
         self.profile_data = None
         self.analysis_results = {}
         self.fusion_stats = {}
+        self.throughput_stats = {}
 
     def run_profiling(
         self,
@@ -188,11 +190,19 @@ class FusedProfilerAnalyzer:
             optimizer.step()
             optimizer.zero_grad()
 
-        # Profiled steps
+        # Profiled steps with timing
         print(f"   Running {num_steps} steps with profiling...")
         prof.start()
         
+        # Track timing for throughput calculation
+        step_times = []
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        start_time = time.time()
+        
         for step in range(num_steps):
+            step_start = time.time()
+            
             msa_tokens, pair_features, target_distances = dataset.get_batch(batch_size)
             msa_tokens = msa_tokens.to(device)
             pair_features = pair_features.to(device)
@@ -205,11 +215,36 @@ class FusedProfilerAnalyzer:
             optimizer.zero_grad()
 
             prof.step()
+            
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            step_time = time.time() - step_start
+            step_times.append(step_time)
 
             if step % 5 == 0:
                 print(f"      Step {step}/{num_steps} - Loss: {loss.item():.4f}")
 
         prof.stop()
+        
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        total_time = time.time() - start_time
+        
+        # Calculate throughput statistics
+        total_samples = num_steps * batch_size
+        avg_step_time = sum(step_times) / len(step_times) if step_times else 0
+        avg_throughput = batch_size / avg_step_time if avg_step_time > 0 else 0
+        
+        self.throughput_stats = {
+            'total_steps': num_steps,
+            'batch_size': batch_size,
+            'total_samples': total_samples,
+            'total_time_sec': total_time,
+            'avg_step_time_ms': avg_step_time * 1000,
+            'avg_throughput_samples_per_sec': avg_throughput,
+            'min_step_time_ms': min(step_times) * 1000 if step_times else 0,
+            'max_step_time_ms': max(step_times) * 1000 if step_times else 0
+        }
 
         self.profile_data = prof
         print("\n   Profiling complete!")
@@ -389,6 +424,10 @@ class FusedProfilerAnalyzer:
         print(f"\nComprehensive report saved to: {output_file}")
         return report_content
 
+    def get_throughput_summary(self) -> Dict[str, Any]:
+        """Get throughput summary statistics."""
+        return self.throughput_stats
+    
     def export_analysis(self, output_file: Optional[str] = None):
         """Export analysis results to JSON."""
         if output_file is None:
@@ -397,6 +436,7 @@ class FusedProfilerAnalyzer:
         export_data = {
             'fusion_statistics': self.fusion_stats,
             'analysis_results': self.analysis_results,
+            'throughput_statistics': self.throughput_stats,
             'timestamp': datetime.now().isoformat()
         }
         
@@ -499,6 +539,22 @@ def main():
         
         # Export analysis
         analyzer.export_analysis()
+        
+        # Print throughput summary
+        throughput_stats = analyzer.get_throughput_summary()
+        if throughput_stats:
+            print("\n" + "="*70)
+            print("THROUGHPUT SUMMARY")
+            print("="*70)
+            print(f"   Total steps:           {throughput_stats['total_steps']}")
+            print(f"   Batch size:            {throughput_stats['batch_size']}")
+            print(f"   Total samples:         {throughput_stats['total_samples']}")
+            print(f"   Total time:            {throughput_stats['total_time_sec']:.2f} seconds")
+            print(f"   Average step time:     {throughput_stats['avg_step_time_ms']:.2f} ms")
+            print(f"   Average throughput:     {throughput_stats['avg_throughput_samples_per_sec']:.2f} samples/sec")
+            print(f"   Min step time:         {throughput_stats['min_step_time_ms']:.2f} ms")
+            print(f"   Max step time:         {throughput_stats['max_step_time_ms']:.2f} ms")
+            print("="*70)
         
         # Print summary
         print("\n" + "="*70)

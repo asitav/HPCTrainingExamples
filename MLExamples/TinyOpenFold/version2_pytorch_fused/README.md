@@ -301,7 +301,7 @@ AMD offers three performance profiling tools for ROCm-based applications:
 ./run_rocprofv3.sh --batch-size 4 --seq-len 64
 
 # View kernel statistics
-less rocprofv3_results_*/rocprofv3_summary.txt
+less rocprofv3_profiles_v2/rocprofv3_summary.txt
 ```
 
 **Key Metrics:**

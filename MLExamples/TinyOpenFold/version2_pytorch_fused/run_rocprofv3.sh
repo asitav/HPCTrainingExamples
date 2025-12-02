@@ -42,8 +42,8 @@ BATCH_SIZE=4
 SEQ_LEN=64
 NUM_BLOCKS=4
 NUM_SEQS=16
-NUM_STEPS=30
-OUTPUT_DIR="./rocprofv3_results_$(date +%Y%m%d_%H%M%S)"
+NUM_STEPS=20
+OUTPUT_DIR="./rocprofv3_profiles_v2"
 PROFILE_KERNELS=true
 PROFILE_HIP_TRACE=true
 TRACE_GPU_MEMORY=true
@@ -155,7 +155,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --seq-len N             Sequence length (default: 64)"
             echo "  --num-blocks N          Number of Evoformer blocks (default: 4)"
             echo "  --num-seqs N            Number of MSA sequences (default: 16)"
-            echo "  --num-steps N           Training steps (default: 30)"
+            echo "  --num-steps N           Training steps (default: 20)"
             echo "  --output-dir DIR        Output directory"
             echo "  --profile-kernels       Enable kernel profiling (default)"
             echo "  --no-kernel-trace       Disable kernel tracing"
