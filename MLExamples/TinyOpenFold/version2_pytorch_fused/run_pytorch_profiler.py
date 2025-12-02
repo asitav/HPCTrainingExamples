@@ -51,6 +51,24 @@ from tiny_openfold_v2 import (
 )
 
 
+def get_gpu_time_total(event) -> float:
+    """
+    Get GPU time total in a ROCm-compatible way.
+    
+    On ROCm, PyTorch may expose 'device_time_total' instead of 'cuda_time_total'.
+    This function checks for both attributes to ensure compatibility.
+    
+    Args:
+        event: FunctionEventAvg object from PyTorch profiler
+        
+    Returns:
+        GPU time in microseconds (0 if not available)
+    """
+    if hasattr(event, 'device_time_total'):
+        return event.device_time_total
+    return getattr(event, 'cuda_time_total', 0)
+
+
 class FusedProfilerAnalyzer:
     """Advanced PyTorch profiler analysis for fused Evoformer implementation."""
 
@@ -231,7 +249,7 @@ class FusedProfilerAnalyzer:
         fusion_analysis = {}
         for category, events_list in fusion_categories.items():
             if events_list:
-                total_time = sum(e.cuda_time_total if torch.cuda.is_available() else e.cpu_time_total 
+                total_time = sum(get_gpu_time_total(e) if torch.cuda.is_available() else e.cpu_time_total 
                                for e in events_list)
                 total_calls = sum(e.count for e in events_list)
                 fusion_analysis[category] = {
@@ -313,11 +331,11 @@ class FusedProfilerAnalyzer:
             report_lines.append("|-----------|---------------|---------------|-------|---------------|")
             
             sorted_events = sorted(events, 
-                                 key=lambda e: e.cuda_time_total if torch.cuda.is_available() else e.cpu_time_total,
+                                 key=lambda e: get_gpu_time_total(e) if torch.cuda.is_available() else e.cpu_time_total,
                                  reverse=True)[:15]
             
             for event in sorted_events:
-                gpu_time = event.cuda_time_total / 1000.0 if torch.cuda.is_available() else 0
+                gpu_time = get_gpu_time_total(event) / 1000.0 if torch.cuda.is_available() else 0
                 cpu_time = event.cpu_time_total / 1000.0
                 avg_time = gpu_time / event.count if event.count > 0 else 0
                 report_lines.append(f"| {event.key[:50]} | {gpu_time:.2f} | {cpu_time:.2f} | {event.count} | {avg_time:.3f} |")
