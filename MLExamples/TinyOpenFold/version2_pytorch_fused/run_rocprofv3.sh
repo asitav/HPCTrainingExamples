@@ -45,8 +45,8 @@ NUM_SEQS=16
 NUM_STEPS=20
 OUTPUT_DIR="./rocprofv3_profiles_v2"
 PROFILE_KERNELS=true
-PROFILE_HIP_TRACE=true
-TRACE_GPU_MEMORY=true
+PROFILE_HIP_TRACE=false
+TRACE_GPU_MEMORY=false
 RUNTIME_TRACE=false
 DETAILED_METRICS=false
 FUSION_ANALYSIS=true
@@ -259,9 +259,11 @@ if [ "$RUNTIME_TRACE" = true ]; then
     ROCPROF_ARGS="$ROCPROF_ARGS --runtime-trace"
 fi
 
-# Add pftrace output format for time trace
+# Add output format - default to csv if OUTPUT_PFTRACE is not set
 if [ "$OUTPUT_PFTRACE" = true ]; then
     ROCPROF_ARGS="$ROCPROF_ARGS --output-format pftrace"
+else
+    ROCPROF_ARGS="$ROCPROF_ARGS --output-format csv"
 fi
 
 # Add output file prefix for rocprofv3 -o flag (similar to PyTorch profiler format: hostname_pid.timestamp)
@@ -332,10 +334,14 @@ if [ -f "$KERNEL_STATS" ]; then
         
         # Parse and display top kernels
         if command -v python3 &> /dev/null; then
-            python3 << 'EOF'
+            python3 << EOF "$KERNEL_STATS"
 import csv
 import sys
 from pathlib import Path
+
+if len(sys.argv) < 2:
+    print("Error: Kernel stats file path not provided")
+    sys.exit(1)
 
 kernel_stats = Path(sys.argv[1])
 if kernel_stats.exists():
@@ -381,8 +387,9 @@ if kernel_stats.exists():
             cat_calls = sum(int(k.get('Calls', 0)) for k in category_kernels)
             cat_percent = (cat_time_ms / total_time_ms * 100) if total_time_ms > 0 else 0
             print(f"{category:<25} {cat_time_ms:>10.2f} ms ({cat_percent:>5.1f}%)  {cat_calls:>8} calls")
+else:
+    print(f"Error: Kernel stats file not found: {kernel_stats}")
 EOF
-            python3 -c "import sys; sys.argv.append('$KERNEL_STATS')" "$KERNEL_STATS" 2>/dev/null || echo "Error parsing kernel stats"
         fi
         
         echo ""
