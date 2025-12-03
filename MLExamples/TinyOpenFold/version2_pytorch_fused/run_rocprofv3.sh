@@ -48,6 +48,8 @@ PROFILE_KERNELS=true
 PROFILE_HIP_TRACE=false
 TRACE_GPU_MEMORY=false
 RUNTIME_TRACE=false
+MARKER_TRACE=false
+TRUNCATE_KERNELS=false
 DETAILED_METRICS=false
 FUSION_ANALYSIS=true
 OUTPUT_PFTRACE=false
@@ -85,43 +87,59 @@ while [[ $# -gt 0 ]]; do
             OUTPUT_DIR="$2"
             shift 2
             ;;
-        --profile-kernels)
+        --profile-kernels | -k)
             PROFILE_KERNELS=true
             shift
             ;;
-        --no-kernel-trace)
+        --no-kernel-trace | -nk)
             PROFILE_KERNELS=false
             shift
             ;;
-        --profile-hip-trace)
+        --profile-hip-trace | -ht)
             PROFILE_HIP_TRACE=true
             shift
             ;;
-        --no-hip-trace)
+        --no-hip-trace | -nht)
             PROFILE_HIP_TRACE=false
             shift
             ;;
-        --trace-gpu-memory)
+        --trace-gpu-memory | -m)
             TRACE_GPU_MEMORY=true
             shift
             ;;
-        --runtime-trace)
+        --runtime-trace | -r)
             RUNTIME_TRACE=true
             shift
             ;;
-        --no-runtime-trace)
+        --no-runtime-trace | -nr)
             RUNTIME_TRACE=false
+            shift
+            ;;
+        --marker-trace | -mt)
+            MARKER_TRACE=true
+            shift
+            ;;
+        --no-marker-trace | -nmt)
+            MARKER_TRACE=false
+            shift
+            ;;
+        --truncate-kernels | -tk)
+            TRUNCATE_KERNELS=true
+            shift
+            ;;
+        --no-truncate-kernels | -ntk)
+            TRUNCATE_KERNELS=false
             shift
             ;;
         --detailed-metrics)
             DETAILED_METRICS=true
             shift
             ;;
-        --output-pftrace)
+        --output-pftrace | -pf)
             OUTPUT_PFTRACE=true
             shift
             ;;
-        --no-pftrace)
+        --no-pftrace | -npf)
             OUTPUT_PFTRACE=false
             shift
             ;;
@@ -159,14 +177,18 @@ while [[ $# -gt 0 ]]; do
             echo "  --output-dir DIR        Output directory"
             echo "  --profile-kernels       Enable kernel profiling (default)"
             echo "  --no-kernel-trace       Disable kernel tracing"
-            echo "  --profile-hip-trace     Enable HIP API tracing (default)"
+            echo "  --profile-hip-trace     Enable HIP API tracing"
             echo "  --no-hip-trace          Disable HIP API tracing"
-            echo "  --trace-gpu-memory      Enable GPU memory tracing (default)"
-            echo "  --runtime-trace         Enable runtime trace (default)"
+            echo "  --trace-gpu-memory | -m Enable GPU memory tracing"
+            echo "  --runtime-trace         Enable runtime trace"
             echo "  --no-runtime-trace      Disable runtime trace"
+            echo "  --marker-trace | -mt    Enable marker trace"
+            echo "  --no-marker-trace | -nmt Disable marker trace"
+            echo "  --truncate-kernels | -tk Enable kernel name truncation (default: disabled)"
+            echo "  --no-truncate-kernels | -ntk Disable kernel name truncation"
             echo "  --detailed-metrics      Enable detailed hardware metrics"
-            echo "  --output-pftrace        Enable pftrace time trace output format"
-            echo "  --no-pftrace            Disable pftrace output (default)"
+            echo "  --output-pftrace | -pf Enable pftrace time trace output format"
+            echo "  --no-pftrace | -npf     Disable pftrace output (default)"
             echo "  --no-fusion-analysis    Disable fusion-specific analysis"
             echo ""
             echo "Fusion Configuration:"
@@ -215,9 +237,11 @@ log_info "  Output directory: $OUTPUT_DIR"
 echo ""
 log_info "Profiling Options:"
 log_info "  Kernel tracing: $PROFILE_KERNELS"
+log_info "  Truncate kernels: $TRUNCATE_KERNELS"
 log_info "  HIP API tracing: $PROFILE_HIP_TRACE"
 log_info "  GPU memory tracing: $TRACE_GPU_MEMORY"
 log_info "  Runtime trace: $RUNTIME_TRACE"
+log_info "  Marker trace: $MARKER_TRACE"
 log_info "  Detailed metrics: $DETAILED_METRICS"
 log_info "  Pftrace output: $OUTPUT_PFTRACE"
 log_info "  Fusion analysis: $FUSION_ANALYSIS"
@@ -241,7 +265,9 @@ ROCPROF_ARGS=""
 if [ "$PROFILE_KERNELS" = true ]; then
     ROCPROF_ARGS="$ROCPROF_ARGS --kernel-trace"
     ROCPROF_ARGS="$ROCPROF_ARGS --stats"
-    ROCPROF_ARGS="$ROCPROF_ARGS --truncate-kernels"
+    if [ "$TRUNCATE_KERNELS" = true ]; then
+        ROCPROF_ARGS="$ROCPROF_ARGS --truncate-kernels"
+    fi
 fi
 
 # Add HIP API tracing
@@ -257,6 +283,11 @@ fi
 # Add runtime trace --runtime-trace from command line option if provided
 if [ "$RUNTIME_TRACE" = true ]; then
     ROCPROF_ARGS="$ROCPROF_ARGS --runtime-trace"
+fi
+
+# Add marker trace
+if [ "$MARKER_TRACE" = true ]; then
+    ROCPROF_ARGS="$ROCPROF_ARGS --marker-trace"
 fi
 
 # Add output format - default to csv if OUTPUT_PFTRACE is not set
