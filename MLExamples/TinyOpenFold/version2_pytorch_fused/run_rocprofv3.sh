@@ -44,11 +44,13 @@ NUM_BLOCKS=4
 NUM_SEQS=16
 NUM_STEPS=20
 OUTPUT_DIR="./rocprofv3_profiles_v2"
-PROFILE_KERNELS=true
+PROFILE_KERNELS=false
+KERNELS_EXPLICITLY_SET=false
 PROFILE_HIP_TRACE=false
 TRACE_GPU_MEMORY=false
 RUNTIME_TRACE=false
 MARKER_TRACE=false
+SYS_TRACE=false
 TRUNCATE_KERNELS=false
 DETAILED_METRICS=false
 FUSION_ANALYSIS=true
@@ -89,10 +91,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         --profile-kernels | -k)
             PROFILE_KERNELS=true
+            KERNELS_EXPLICITLY_SET=true
             shift
             ;;
         --no-kernel-trace | -nk)
             PROFILE_KERNELS=false
+            KERNELS_EXPLICITLY_SET=true
             shift
             ;;
         --profile-hip-trace | -ht)
@@ -121,6 +125,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-marker-trace | -nmt)
             MARKER_TRACE=false
+            shift
+            ;;
+        --sys-trace | -s)
+            SYS_TRACE=true
+            shift
+            ;;
+        --no-sys-trace | -ns)
+            SYS_TRACE=false
             shift
             ;;
         --truncate-kernels | -tk)
@@ -184,6 +196,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --no-runtime-trace      Disable runtime trace"
             echo "  --marker-trace | -mt    Enable marker trace"
             echo "  --no-marker-trace | -nmt Disable marker trace"
+            echo "  --sys-trace | -s        Enable sys trace"
+            echo "  --no-sys-trace | -ns    Disable sys trace"
             echo "  --truncate-kernels | -tk Enable kernel name truncation (default: disabled)"
             echo "  --no-truncate-kernels | -ntk Disable kernel name truncation"
             echo "  --detailed-metrics      Enable detailed hardware metrics"
@@ -212,6 +226,13 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Enable PROFILE_KERNELS by default only if no other trace options are enabled
+if [ "$KERNELS_EXPLICITLY_SET" = false ]; then
+    if [ "$PROFILE_HIP_TRACE" = false ] && [ "$TRACE_GPU_MEMORY" = false ] && [ "$RUNTIME_TRACE" = false ] && [ "$MARKER_TRACE" = false ] && [ "$SYS_TRACE" = false ]; then
+        PROFILE_KERNELS=true
+    fi
+fi
 
 # Check if rocprofv3 is available
 if ! command -v rocprofv3 &> /dev/null; then
@@ -242,6 +263,7 @@ log_info "  HIP API tracing: $PROFILE_HIP_TRACE"
 log_info "  GPU memory tracing: $TRACE_GPU_MEMORY"
 log_info "  Runtime trace: $RUNTIME_TRACE"
 log_info "  Marker trace: $MARKER_TRACE"
+log_info "  Sys trace: $SYS_TRACE"
 log_info "  Detailed metrics: $DETAILED_METRICS"
 log_info "  Pftrace output: $OUTPUT_PFTRACE"
 log_info "  Fusion analysis: $FUSION_ANALYSIS"
@@ -261,10 +283,12 @@ echo ""
 ROCPROF_CMD="rocprofv3"
 ROCPROF_ARGS=""
 
+# add stats option by default
+ROCPROF_ARGS="$ROCPROF_ARGS --stats"
+
 # Add kernel tracing
 if [ "$PROFILE_KERNELS" = true ]; then
     ROCPROF_ARGS="$ROCPROF_ARGS --kernel-trace"
-    ROCPROF_ARGS="$ROCPROF_ARGS --stats"
     if [ "$TRUNCATE_KERNELS" = true ]; then
         ROCPROF_ARGS="$ROCPROF_ARGS --truncate-kernels"
     fi
@@ -288,6 +312,11 @@ fi
 # Add marker trace
 if [ "$MARKER_TRACE" = true ]; then
     ROCPROF_ARGS="$ROCPROF_ARGS --marker-trace"
+fi
+
+# Add sys trace
+if [ "$SYS_TRACE" = true ]; then
+    ROCPROF_ARGS="$ROCPROF_ARGS --sys-trace"
 fi
 
 # Add output format - default to csv if OUTPUT_PFTRACE is not set
