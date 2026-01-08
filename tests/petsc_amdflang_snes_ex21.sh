@@ -7,8 +7,17 @@
 # https://github.com/amd/HPCTrainingDock/blob/main/extras/scripts/petsc_setup.sh
 
 
-module load rocm
-module load openmpi petsc_amdflang
+if ! module is-loaded "rocm"; then
+  echo "rocm module is not loaded"
+  echo "loading default rocm module"
+  module load rocm
+fi
+module load openmpi
+module load petsc_amdflang >& /dev/null
+if [ "$?" == "1" ]; then
+    module load petsc
+fi
+
 
 PETSC_VERSION=`$PETSC_DIR/lib/petsc/bin/petscversion`
 

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 UMPIRE_PATH=${PWD}/Umpire_install
+rm -rf Umpire_source
 git clone --recursive https://github.com/LLNL/Umpire.git Umpire_source
 cd Umpire_source
 sed -i 's/memoryType/type/g' src/umpire/tpl/camp/include/camp/resource/hip.hpp
@@ -11,8 +12,15 @@ sed -i 's/Mfree/ffree-form/g' tests/integration/interface/fortran/CMakeLists.txt
 mkdir -p build && cd build
 mkdir $UMPIRE_PATH
 
-module load rocm
-module load amdflang-new
+if ! module is-loaded "rocm"; then
+  echo "rocm module is not loaded"
+  echo "loading default rocm module"
+  module load rocm
+fi
+module load amdflang-new >& /dev/null
+if [ "$?" == "1" ]; then
+   module load amdclang
+fi
 
 AMDGPU_GFXMODEL=`rocminfo | grep gfx | sed -e 's/Name://' | head -1 |sed 's/ //g'`
 
