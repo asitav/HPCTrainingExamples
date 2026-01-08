@@ -40,22 +40,52 @@ TinyOpenFold is an educational implementation of the core AlphaFold 2 architectu
 
 ## Quick Start
 
-### Installation
+### Environment Setup and Installation
+
+Set up your Python environment and install dependencies:
 
 ```bash
-# Navigate to the TinyOpenFold directory
-cd HPCTrainingExamples/MLExamples/TinyOpenFold/version1_pytorch_baseline
+# Load modules (choose one option)
+module load python/3.12 rocm/6.4.1        # Standard Python (recommended)
+# OR
+module load cray-python rocm/6.4.1        # Cray environment
 
-# Ensure PyTorch is installed
-# For CUDA: pip install torch
-# For ROCm: Follow PyTorch ROCm installation guide
+# Navigate to TinyOpenFold directory
+cd HPCTrainingExamples/MLExamples/TinyOpenFold
+
+# Create and activate virtual environment
+python3 -m venv venvOF
+source venvOF/bin/activate
+
+# Verify Python version
+python3 --version
+
+# Upgrade pip and install build tools
+pip install --upgrade pip setuptools wheel
+
+# Install PyTorch with ROCm support
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.4
+
+# Verify PyTorch installation
+python3 -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA Available: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
+
+# Install DeepSpeed
+pip install deepspeed
+
+# Verify DeepSpeed installation
+python3 -c "from deepspeed.profiling.flops_profiler import FlopsProfiler; print('DeepSpeed installed successfully.')"
+
+# Install additional dependencies (if needed)
+pip install -r setup/requirements.txt
 ```
+
+**Note**: Activate the virtual environment (`source venvOF/bin/activate`) each time you start a new session.
 
 ### Basic Training
 
 ```bash
 # Run with default configuration (64 residues, 16 MSA sequences)
-python tiny_openfold_v1.py --batch-size 4 --seq-len 64 --num-steps 30
+python3 tiny_openfold_v1.py --batch-size 4 --seq-len 64 --num-steps 30
 
 # Expected output:
 # Total parameters: ~2.6M
@@ -67,7 +97,7 @@ python tiny_openfold_v1.py --batch-size 4 --seq-len 64 --num-steps 30
 
 ```bash
 # Enable PyTorch profiler
-python tiny_openfold_v1.py --enable-pytorch-profiler --profile-dir ./profiles
+python3 tiny_openfold_v1.py --enable-pytorch-profiler --profile-dir ./profiles
 
 # View results in TensorBoard
 tensorboard --logdir ./profiles
@@ -77,7 +107,7 @@ tensorboard --logdir ./profiles
 
 ```bash
 # Larger model
-python tiny_openfold_v1.py \
+python3 tiny_openfold_v1.py \
     --msa-dim 128 \
     --pair-dim 256 \
     --num-blocks 8 \
@@ -85,12 +115,12 @@ python tiny_openfold_v1.py \
     --batch-size 2
 
 # With memory profiling
-python tiny_openfold_v1.py \
+python3 tiny_openfold_v1.py \
     --enable-all-profiling \
     --profile-dir ./complete_analysis
 
 # Mixed precision training
-python tiny_openfold_v1.py --use-amp --batch-size 8
+python3 tiny_openfold_v1.py --use-amp --batch-size 8
 ```
 
 ### Multi-GPU Training
@@ -99,17 +129,17 @@ TinyOpenFold supports multi-GPU training using PyTorch's `nn.DataParallel`:
 
 ```bash
 # Single GPU (explicit)
-python tiny_openfold_v1.py --device 0 --batch-size 8
+python3 tiny_openfold_v1.py --device 0 --batch-size 8
 
 # Multi-GPU via environment variables (automatic)
 # ROCm (AMD GPUs)
-ROCR_VISIBLE_DEVICES=0,1,2,3 python tiny_openfold_v1.py --batch-size 32
+ROCR_VISIBLE_DEVICES=0,1,2,3 python3 tiny_openfold_v1.py --batch-size 32
 
 # CUDA (NVIDIA GPUs)
-CUDA_VISIBLE_DEVICES=0,1,2,3 python tiny_openfold_v1.py --batch-size 32
+CUDA_VISIBLE_DEVICES=0,1,2,3 python3 tiny_openfold_v1.py --batch-size 32
 
 # Disable DataParallel even with multiple GPUs visible
-python tiny_openfold_v1.py --no-data-parallel --device 0
+python3 tiny_openfold_v1.py --no-data-parallel --device 0
 ```
 
 **Best Practice:** Scale batch size proportionally with GPU count (e.g., 8 samples per GPU).
@@ -330,16 +360,16 @@ If you encounter OOM errors:
 
 ```bash
 # Reduce batch size
-python tiny_openfold_v1.py --batch-size 2
+python3 tiny_openfold_v1.py --batch-size 2
 
 # Reduce sequence length
-python tiny_openfold_v1.py --seq-len 32
+python3 tiny_openfold_v1.py --seq-len 32
 
 # Reduce MSA sequences
-python tiny_openfold_v1.py --num-seqs 8
+python3 tiny_openfold_v1.py --num-seqs 8
 
 # Use mixed precision
-python tiny_openfold_v1.py --use-amp
+python3 tiny_openfold_v1.py --use-amp
 ```
 
 ### Slow Performance
@@ -348,13 +378,13 @@ The triangle operations are O(N³) and can be slow:
 
 ```bash
 # Use smaller sequences
-python tiny_openfold_v1.py --seq-len 32
+python3 tiny_openfold_v1.py --seq-len 32
 
 # Reduce Evoformer blocks
-python tiny_openfold_v1.py --num-blocks 2
+python3 tiny_openfold_v1.py --num-blocks 2
 
 # Profile to identify bottlenecks
-python tiny_openfold_v1.py --enable-pytorch-profiler
+python3 tiny_openfold_v1.py --enable-pytorch-profiler
 ```
 
 ## Further Reading
@@ -421,6 +451,6 @@ Apache 2.0 License - See LICENSE file for details
 
 ```bash
 cd version1_pytorch_baseline
-python tiny_openfold_v1.py --validate-setup
+python3 tiny_openfold_v1.py --validate-setup
 ```
 
