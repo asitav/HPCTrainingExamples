@@ -849,6 +849,10 @@ def train_tiny_openfold(
         use_multi_gpu = False
         print(f"\n   Single GPU mode: Using default device ({device})")
     
+    # Ensure profile directory exists
+    if profiler_config.profile_dir:
+        Path(profiler_config.profile_dir).mkdir(parents=True, exist_ok=True)
+    
     # Create model
     model = TinyOpenFold(config)
     
@@ -1041,6 +1045,7 @@ def train_tiny_openfold(
         }
 
         profile_path = Path(profiler_config.profile_dir) / "performance_summary.json"
+        profile_path.parent.mkdir(parents=True, exist_ok=True)
         with open(profile_path, 'w') as f:
             json.dump(profile_data, f, indent=2)
 
