@@ -70,10 +70,23 @@ python tiny_openfold_v2.py --batch-size 4 --seq-len 64
 
 ```bash
 # Verify fusion optimizations work correctly
-python tiny_openfold_v2.py --validate-setup
+python3 tiny_openfold_v2.py --validate-setup
 
 # Should output:
-# V2 validation successful! Fusion optimizations working correctly.
+# V2 validation successful! Fusion setup working properly.
+```
+
+### Compare Fusion vs Baseline
+
+```bash
+# Compare all fusion enabled vs baseline (all fusion disabled)
+python3 tiny_openfold_v2.py --compare-fusion --batch-size 4 --num-steps 50
+
+# Output shows:
+# - Training speed comparison (speedup)
+# - Memory usage comparison (reduction)
+# - Batch time comparison (improvement)
+# - Kernel reduction percentage
 ```
 
 ### Enable All Fusions
@@ -551,14 +564,26 @@ python -c "import torch; print(hasattr(torch, 'compile'))"
 python tiny_openfold_v2.py --disable-all-fusion
 ```
 
-### Numerical Accuracy Validation
+### Numerical Accuracy Verification
 
 ```bash
-# Compare V2 with V1 outputs
-python tiny_openfold_v2.py --validate-setup
+# Verify that fused version produces numerically equivalent outputs to baseline
+python3 tiny_openfold_v2.py --verify-accuracy --batch-size 4
 
-# Should report numerical accuracy within tolerance
+# Output shows:
+# - Absolute differences (max, mean)
+# - Relative differences (max, mean)
+# - Numerical equivalence check (PASS/FAIL)
+# - Tolerance: rtol=1e-3, atol=1e-4
 ```
+
+**What it does:**
+- Creates both fused and unfused models with identical weights
+- Runs inference with the same inputs
+- Compares outputs using `torch.allclose()` with tolerance `rtol=1e-3, atol=1e-4`
+- Reports absolute and relative differences
+
+**Expected result:** ✓ PASS - Fusion optimizations should produce outputs within numerical precision tolerance
 
 ### Performance Debugging
 
