@@ -265,6 +265,45 @@ MSA_Embedding + Pair_Embedding
 - FP32: 2,641,728 × 4 / 1e6 = **10.6 MB**
 - FP16/BF16: 2,641,728 × 2 / 1e6 = **5.3 MB**
 
+## Data Structure and Batching
+
+### Batch Size
+**Batch size** refers to the number of protein samples processed simultaneously in one forward/backward pass. For example, `batch_size=4` means 4 complete protein structures are processed together.
+
+### Sample Structure
+Each **sample** represents one complete protein structure with three components:
+
+1. **MSA Tokens**: Shape `(n_seqs, seq_len)` = `(16, 64)`
+   - Integer tokens (0-20) representing amino acids
+   - 16 MSA sequences × 64 amino acids per sequence
+
+2. **Pair Features**: Shape `(seq_len, seq_len, pair_input_dim)` = `(64, 64, 65)`
+   - Pairwise feature matrix: 64×64 residues with 65 features per pair
+
+3. **Target Distances**: Shape `(seq_len, seq_len, 1)` = `(64, 64, 1)`
+   - Ground truth distance matrix for structure prediction
+
+**Total per sample**: ~271K elements (mostly from pair features: 266K floats)
+
+**Batch processing**: With `batch_size=4`, tensors have shape `(4, ...)` for all three components, enabling parallel processing of multiple proteins.
+
+### Sample Speed Evaluation
+**Training speed** (samples/sec) measures throughput and is calculated as:
+
+```
+speed = batch_size / batch_time
+```
+
+Where `batch_time` includes:
+- Forward pass (model inference)
+- Backward pass (gradient computation)
+- Optimizer step (parameter update)
+
+**Example**: With `batch_size=4` and `batch_time=25ms`:
+- Speed = 4 / 0.025 = **160 samples/sec**
+
+**Average training speed** is computed across all training steps, providing a stable metric for performance comparison. Higher values indicate better GPU utilization and faster training.
+
 ## Training Memory Requirements
 
 Similar to transformers, training requires:
