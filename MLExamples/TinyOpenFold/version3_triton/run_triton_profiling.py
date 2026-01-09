@@ -83,7 +83,7 @@ def profile_layernorm(device, dim=128, batch_size=1024):
         'triton_time_ms': triton_time * 1000,
         'pytorch_time_ms': pytorch_time * 1000,
         'speedup': pytorch_time / triton_time,
-        'relative_error': float(rel_error)
+        'relative_error': rel_error.item()
     }
 
 
