@@ -19,7 +19,7 @@ echo ""
 # Configuration
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 STUDY_DIR="performance_study_${TIMESTAMP}"
-NUM_STEPS=50
+NUM_STEPS=30
 BATCH_SIZE=4
 SEQ_LEN=64
 NUM_RUNS=3
