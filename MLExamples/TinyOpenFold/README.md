@@ -46,28 +46,31 @@ Set up your Python environment and install dependencies:
 
 ```bash
 # Load modules (choose one option)
-module load python/3.12 rocm/6.4.1        # Standard Python (recommended)
+module load python/3.12 rocm/7.1.1        # Standard Python (recommended)
 # OR
-module load cray-python rocm/6.4.1        # Cray environment
+module load cray-python rocm/7.1.1        # Cray environment
 
 # Navigate to TinyOpenFold directory
 cd HPCTrainingExamples/MLExamples/TinyOpenFold
 
 # Create and activate virtual environment
+# Option 1: Create new venv
 python3 -m venv venvOF
 source venvOF/bin/activate
+
+# Option 2: Use existing venvOFr711 (recommended for ROCm 7.1.1)
+source venvOFr711/bin/activate
 
 # Verify Python version
 python3 --version
 
 # Upgrade pip and install build tools
-pip install --upgrade pip setuptools wheel
+pip3 install --upgrade pip setuptools wheel
 
 # Install PyTorch with ROCm/6.4 support
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.4
 
 # Install PyTorch with ROCM/7.1.1. source: https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/docs/install/installrad/native_linux/install-pytorch.html#option-a-pytorch-via-pip-installation
-
 wget https://repo.radeon.com/rocm/manylinux/rocm-rel-7.1.1/torch-2.9.1%2Brocm7.1.1.lw.git351ff442-cp312-cp312-linux_x86_64.whl
 wget https://repo.radeon.com/rocm/manylinux/rocm-rel-7.1.1/torchvision-0.24.0%2Brocm7.1.1.gitb919bd0c-cp312-cp312-linux_x86_64.whl
 wget https://repo.radeon.com/rocm/manylinux/rocm-rel-7.1.1/triton-3.5.1%2Brocm7.1.1.gita272dfa8-cp312-cp312-linux_x86_64.whl
@@ -75,17 +78,32 @@ wget https://repo.radeon.com/rocm/manylinux/rocm-rel-7.1.1/torchaudio-2.9.0%2Bro
 pip3 uninstall torch torchvision triton torchaudio
 pip3 install torch-2.9.1+rocm7.1.1.lw.git351ff442-cp312-cp312-linux_x86_64.whl torchvision-0.24.0+rocm7.1.1.gitb919bd0c-cp312-cp312-linux_x86_64.whl torchaudio-2.9.0+rocm7.1.1.gite3c6ee2b-cp312-cp312-linux_x86_64.whl triton-3.5.1+rocm7.1.1.gita272dfa8-cp312-cp312-linux_x86_64.whl
 
+# Fix libcaffe2_nvrtc.so library loading issue
+# Ensure ROCm and libffi modules are loaded (sets up library paths)
+module load rocm/7.1.1 libffi/3.3
+
+# Activate venv (if using venvOFr711)
+source venvOFr711/bin/activate
+
+# Add PyTorch lib directory from venv to LD_LIBRARY_PATH
+# This ensures caffe2 libraries are found from the venv installation
+export LD_LIBRARY_PATH=$(python3 -c "import torch; import os; print(os.path.join(os.path.dirname(torch.__file__), 'lib'))"):/opt/rocm-7.1.1/lib:$LD_LIBRARY_PATH
+
+# Optional: Add to ~/.bashrc for persistence (use venv path)
+# VENV_PATH="/mnt/thera/data/incoming/asimishr/aiml_prof/HPCTrainingExamples/MLExamples/TinyOpenFold/venvOFr711"
+# echo "export LD_LIBRARY_PATH=\$(python3 -c \"import torch; import os; print(os.path.join(os.path.dirname(torch.__file__), 'lib'))\"):/opt/rocm-7.1.1/lib:\$LD_LIBRARY_PATH" >> ~/.bashrc
+
 # Verify PyTorch installation
 python3 -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA Available: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
 
 # Install DeepSpeed
-pip install deepspeed
+pip3 install deepspeed
 
 # Verify DeepSpeed installation
 python3 -c "from deepspeed.profiling.flops_profiler import FlopsProfiler; print('DeepSpeed installed successfully.')"
 
 # Install additional dependencies (if needed)
-pip install -r setup/requirements.txt
+pip3 install -r setup/requirements.txt
 ```
 
 **Note**: Activate the virtual environment (`source venvOF/bin/activate`) each time you start a new session.
