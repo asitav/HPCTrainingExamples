@@ -13,7 +13,7 @@ After completing this version, you will be able to:
 - Implement QKV fusion for MSA and triangle attention operations
 - Integrate Flash Attention for memory-efficient attention computation
 - Apply gate/proj fusion in triangle multiplicative updates
-- Use ROCm profiling tools (rocprofv3, rocprof-sys, rocprof-compute) for hardware-level analysis
+- Use ROCm profiling tools (rocprofv3, rocprof-sys-python, rocprof-compute) for hardware-level analysis
 - Analyze kernel fusion impact on performance and memory usage
 - Interpret ROCm profiling data for optimization insights
 - Conduct ablation studies to quantify fusion benefits
@@ -322,22 +322,49 @@ less rocprofv3_profiles_v2/rocprofv3_summary.txt
 - Kernel call counts (verify fusion effectiveness)
 - GPU utilization
 
-#### 2. rocprof-sys - Timeline Tracing
+#### 2. rocprof-sys-python - Python Call Stack Profiling
+
+`rocprof-sys-python` provides Python call stack profiling with source-level instrumentation, enabling detailed analysis of function call counts and timing.
 
 ```bash
-# Generate timeline trace
+# Basic profiling with defaults (batch-size=2, seq-len=16 for smaller output)
+./run_rocprof_sys.sh
+
+# Custom batch size and sequence length
 ./run_rocprof_sys.sh --batch-size 4 --seq-len 64
 
-# Visualize with Perfetto
-# 1. Copy .proto file to local machine
-# 2. Open https://ui.perfetto.dev
-# 3. Load the .proto file
+# Direct command-line usage
+rocprof-sys-python --trace -- ./tiny_openfold_v2.py --batch-size 2 --seq-len 16
+```
+
+**Output Files:**
+- **ROCPD format** (`.rocpd` or `.rocpd.json`) - Recommended for AI/ML workloads with better thread support
+- **Perfetto trace** (`.proto`) - Timeline visualization
+- **Call stack data** (`trip_count-*.txt/json`, `wall_clock-*.txt/json`) - Function call counts and timing
+- **Metadata** (`metadata-*.json`, `functions-*.json`) - Function and source information
+
+**Visualization:**
+```bash
+# For Perfetto traces:
+# 1. Copy .proto file to your local machine
+# 2. Open https://ui.perfetto.dev in your browser
+# 3. Click 'Open trace file' and select the .proto file
+
+# For ROCPD format:
+# Use ROCm tools or compatible viewers for AI/ML workload analysis
 ```
 
 **Key Insights:**
-- CPU-GPU synchronization
-- Kernel launch patterns
-- Memory transfer timing
+- Python function call stack with call counts
+- Function-level timing (wall clock, CPU time)
+- CPU-GPU synchronization patterns
+- Memory usage tracking (peak RSS, page RSS)
+- Thread-level profiling
+
+**Documentation:**
+- ROCm Systems Profiler Python Guide: https://rocm.docs.amd.com/projects/rocprofiler-systems/en/latest/how-to/profiling-python-scripts.html
+
+**Note:** Default batch size (2) and sequence length (16) are optimized for profiling to reduce output file sizes. For production analysis, use larger values with `--batch-size` and `--seq-len` flags.
 
 #### 3. rocprof-compute - Hardware Analysis
 
