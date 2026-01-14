@@ -30,11 +30,11 @@ scipy==1.17.0
 setuptools==80.9.0
 six==1.17.0
 sympy==1.14.0
-torch @ file:///mnt/thera/data/incoming/asimishr/aiml_prof/HPCTrainingExamples/MLExamples/TinyOpenFold/software/torch-2.9.1%2Brocm7.1.1.lw.git351ff442-cp312-cp312-linux_x86_64.whl#sha256=1b29534b1785b6428b7f5c39d70b9c8145c41002ab1367051127ceb78eef3e33
-torchaudio @ file:///mnt/thera/data/incoming/asimishr/aiml_prof/HPCTrainingExamples/MLExamples/TinyOpenFold/software/torchaudio-2.9.0%2Brocm7.1.1.gite3c6ee2b-cp312-cp312-linux_x86_64.whl#sha256=3acb2401a52641d7086bfeb42780c6d3575b0fc90b4fc9a5570bee46a74f2f9d
-torchvision @ file:///mnt/thera/data/incoming/asimishr/aiml_prof/HPCTrainingExamples/MLExamples/TinyOpenFold/software/torchvision-0.24.0%2Brocm7.1.1.gitb919bd0c-cp312-cp312-linux_x86_64.whl#sha256=6ec9034b6f59ca811bb3b0c87102a212b2996ddd1636acdba3a4a7559caeb600
+torch==2.11.0.dev20260113+rocm7.1
+torchaudio==2.11.0.dev20260114+rocm7.1
+torchvision==0.25.0.dev20260114+rocm7.1
 tqdm==4.67.1
-triton @ file:///mnt/thera/data/incoming/asimishr/aiml_prof/HPCTrainingExamples/MLExamples/TinyOpenFold/software/triton-3.5.1%2Brocm7.1.1.gita272dfa8-cp312-cp312-linux_x86_64.whl#sha256=2796f572c4f0f1ced79130bd0a2dc82759e6a0d219a10f4c99c4d8031ec0590e
+triton-rocm==3.6.0+git9844da95
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzdata==2025.3

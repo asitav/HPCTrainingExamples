@@ -68,7 +68,6 @@ while [[ $# -gt 0 ]]; do
             echo "  The script sets up environment variables for rocprof-sys-python:"
             echo "  - Sources setup-env.sh: Automatically sets PYTHONPATH, PATH, LD_LIBRARY_PATH"
             echo "  - PYTHONPATH: Includes rocprofsys package location (if not set by setup-env.sh)"
-            echo "  - ROCPROFSYS_CONFIG_FILE: Config file location (default: ~/.rocprof-sys.cfg)"
             echo "  - ROCPROFSYS_PROFILE=ON: Enables profiling"
             echo "  - ROCPROFSYS_USE_ROCPD=ON: Enables ROCPD format (recommended for AI/ML workloads)"
             echo "  - ROCPROFSYS_USE_TRACE=OFF: Disables Perfetto trace (using ROCPD instead)"
@@ -78,9 +77,7 @@ while [[ $# -gt 0 ]]; do
             echo "Note: ROCPD format is recommended for AI/ML workloads (better child thread support)"
             echo "      See: https://rocm.docs.amd.com/projects/rocprofiler-systems/en/latest/how-to/profiling-python-scripts.html"
             echo ""
-            echo "Config file:"
-            echo "  Create ~/.rocprof-sys.cfg to customize rocprof-sys behavior"
-            echo "  See ROCm Systems Profiler documentation for config options"
+            echo "Note: Default rocprof-sys configuration is used (no config file needed)"
             exit 0
             ;;
         *) echo "Unknown option: $1"; exit 1 ;;
@@ -191,8 +188,8 @@ if [ -z "$PYTHONPATH" ] || [[ "$PYTHONPATH" != *"rocprofsys"* ]]; then
 fi
 
 # Basic system setup for rocprof-sys configuration
-# Set config file location (optional, defaults to system location)
-export ROCPROFSYS_CONFIG_FILE="${ROCPROFSYS_CONFIG_FILE:-$HOME/.rocprof-sys.cfg}"
+# Use default configuration (no config file needed)
+unset ROCPROFSYS_CONFIG_FILE
 
 # Enable profiling
 export ROCPROFSYS_PROFILE=ON
