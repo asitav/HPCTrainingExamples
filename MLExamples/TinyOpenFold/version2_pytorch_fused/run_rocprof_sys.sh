@@ -69,15 +69,20 @@ while [[ $# -gt 0 ]]; do
             echo "  - Sources setup-env.sh: Automatically sets PYTHONPATH, PATH, LD_LIBRARY_PATH"
             echo "  - PYTHONPATH: Includes rocprofsys package location (if not set by setup-env.sh)"
             echo "  - ROCPROFSYS_PROFILE=ON: Enables profiling"
-            echo "  - ROCPROFSYS_USE_ROCPD=ON: Enables ROCPD format (recommended for AI/ML workloads)"
-            echo "  - ROCPROFSYS_USE_TRACE=OFF: Disables Perfetto trace (using ROCPD instead)"
-            echo "  - PATH: Includes /opt/rocm-7.1.1/share/rocprofiler-systems for schema discovery"
+            echo "  - ROCPROFSYS_USE_ROCPD: Automatically enabled if rocpd package is found"
+            echo "    (checks Python site-packages for current ROCm version)"
+            echo "  - ROCPROFSYS_USE_TRACE: Enabled if ROCPD is not available, disabled otherwise"
+            echo "  - PATH: Includes ROCm share/rocprofiler-systems for schema discovery"
             echo "  - LD_LIBRARY_PATH: Includes PyTorch lib and ROCm lib directories"
             echo ""
             echo "Note: ROCPD format is recommended for AI/ML workloads (better child thread support)"
+            echo "      The script automatically detects if rocpd is available and enables it accordingly."
             echo "      See: https://rocm.docs.amd.com/projects/rocprofiler-systems/en/latest/how-to/profiling-python-scripts.html"
             echo ""
-            echo "Note: Default rocprof-sys configuration is used (no config file needed)"
+            echo "Config file:"
+            echo "  Default config file: ~/.rocprof-sys.cfg"
+            echo "  If ROCPROFSYS_CONFIG_FILE is not set, rocprof-sys will check for ~/.rocprof-sys.cfg"
+            echo "  If the file doesn't exist, default built-in configuration is used."
             exit 0
             ;;
         *) echo "Unknown option: $1"; exit 1 ;;
@@ -188,28 +193,89 @@ if [ -z "$PYTHONPATH" ] || [[ "$PYTHONPATH" != *"rocprofsys"* ]]; then
 fi
 
 # Basic system setup for rocprof-sys configuration
-# Use default configuration (no config file needed)
-unset ROCPROFSYS_CONFIG_FILE
+# Set config file only if ~/.rocprof-sys.cfg exists, otherwise use defaults
+if [ -f "$HOME/.rocprof-sys.cfg" ]; then
+    export ROCPROFSYS_CONFIG_FILE="$HOME/.rocprof-sys.cfg"
+    log_rocprof "Using config file: $HOME/.rocprof-sys.cfg"
+else
+    unset ROCPROFSYS_CONFIG_FILE
+    log_rocprof "Config file not found, using default built-in configuration"
+fi
 
 # Enable profiling
 export ROCPROFSYS_PROFILE=ON
 
+# Detect ROCm version and check for rocpd availability
+# ROCPD is enabled only if it's packaged with the Python package for the current ROCm version
+ROCM_VERSION=$(module list 2>&1 | grep -oP 'rocm/\K[0-9.]+' | head -1 || echo "")
+if [ -z "$ROCM_VERSION" ]; then
+    # Try to detect from ROCM_PATH or common locations
+    if [ -n "$ROCM_PATH" ]; then
+        ROCM_VERSION=$(basename "$ROCM_PATH" | grep -oP 'rocm-\K[0-9.]+' || echo "")
+    fi
+    if [ -z "$ROCM_VERSION" ]; then
+        # Check common ROCm installation paths
+        for rocm_path in /opt/rocm-*; do
+            if [ -d "$rocm_path" ]; then
+                ROCM_VERSION=$(basename "$rocm_path" | grep -oP 'rocm-\K[0-9.]+' || echo "")
+                [ -n "$ROCM_VERSION" ] && break
+            fi
+        done
+    fi
+fi
+
+# Get Python version
+PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "3.12")
+
+# Check if rocpd is available in Python site-packages for current ROCm version
+ROCPD_AVAILABLE=false
+if [ -n "$ROCM_VERSION" ]; then
+    # Check multiple possible ROCm paths
+    for rocm_base in "/opt/rocm-${ROCM_VERSION}" "/opt/rocm/${ROCM_VERSION}" "$ROCM_PATH"; do
+        if [ -n "$rocm_base" ] && [ -d "$rocm_base" ]; then
+            ROCPD_PATH="${rocm_base}/lib/python${PYTHON_VERSION}/site-packages/rocpd"
+            if [ -d "$ROCPD_PATH" ]; then
+                ROCPD_AVAILABLE=true
+                log_rocprof "Found rocpd package at: $ROCPD_PATH"
+                break
+            fi
+        fi
+    done
+fi
+
 # ROCPD output configuration
-# ROCPD is enabled for AI/ML workloads (better child thread support)
-# Note: rocprof-sys looks for schema at relative path "source/lib/core/rocpd/data_storage/schema/rocpd_tables.sql"
-# This is hardcoded in the compiled library and may need workaround
-export ROCPROFSYS_USE_ROCPD=ON
-
-# Try setting schema path (may not be respected if hardcoded)
-export ROCPROFSYS_ROCPD_SCHEMA_PATH=/opt/rocm-7.1.1/share/rocprofiler-systems/rocpd_tables.sql
-
-# Alternative: Create symlink from expected location if environment variable doesn't work
-# The error comes from libpyrocprofsys.so looking for: source/lib/core/rocpd/data_storage/schema/rocpd_tables.sql
-# This appears to be a build-time path hardcoded in the compiled library
+# ROCPD is enabled only if available (better child thread support for AI/ML workloads)
+if [ "$ROCPD_AVAILABLE" = true ]; then
+    export ROCPROFSYS_USE_ROCPD=ON
+    log_rocprof "ROCPD enabled (rocpd package found)"
+    
+    # Try setting schema path (may not be respected if hardcoded)
+    if [ -n "$ROCM_VERSION" ]; then
+        for rocm_base in "/opt/rocm-${ROCM_VERSION}" "/opt/rocm/${ROCM_VERSION}" "$ROCM_PATH"; do
+            if [ -n "$rocm_base" ] && [ -d "$rocm_base" ]; then
+                SCHEMA_PATH="${rocm_base}/share/rocprofiler-systems/rocpd_tables.sql"
+                if [ -f "$SCHEMA_PATH" ]; then
+                    export ROCPROFSYS_ROCPD_SCHEMA_PATH="$SCHEMA_PATH"
+                    log_rocprof "Set ROCPD schema path: $SCHEMA_PATH"
+                    break
+                fi
+            fi
+        done
+    fi
+else
+    export ROCPROFSYS_USE_ROCPD=OFF
+    log_rocprof "ROCPD disabled (rocpd package not found for ROCm ${ROCM_VERSION:-unknown} / Python ${PYTHON_VERSION})"
+fi
 
 # Trace output configuration (Perfetto format)
-# Disabled - using ROCPD format instead
-export ROCPROFSYS_USE_TRACE=OFF
+# Use Perfetto trace if ROCPD is not available
+if [ "$ROCPD_AVAILABLE" = false ]; then
+    export ROCPROFSYS_USE_TRACE=ON
+    log_rocprof "Using Perfetto trace format (ROCPD not available)"
+else
+    export ROCPROFSYS_USE_TRACE=OFF
+    log_rocprof "Using ROCPD format (Perfetto trace disabled)"
+fi
 
 # Optional: Enable ROCProfiler integration
 # export ROCPROFSYS_USE_ROCPROFILER=ON
@@ -278,9 +344,9 @@ fi
 echo ""
 
 cd "$OUTPUT_DIR"
-# rocprof-sys-python syntax: rocprof-sys-python <ARGS> -- <SCRIPT> <SCRIPT_ARGS>
+# rocprof-sys-python syntax: rocprof-sys-python --trace -- <SCRIPT> <SCRIPT_ARGS>
 # Profiling is controlled via ROCPROFSYS_PROFILE=ON environment variable
-$ROCPROF_SYS_PYTHON_CMD -- ../tiny_openfold_v2.py $PYTHON_ARGS 2>&1 | tee rocprof_sys.log
+$ROCPROF_SYS_PYTHON_CMD --trace -- ../tiny_openfold_v2.py $PYTHON_ARGS 2>&1 | tee rocprof_sys.log
 cd - > /dev/null
 
 log_step "Profiling complete!"
